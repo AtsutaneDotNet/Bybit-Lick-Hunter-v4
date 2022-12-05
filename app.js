@@ -85,8 +85,9 @@ wsClient.on('update', (data) => {
             liquidationOrders[index].timestamp = timestamp;
             liquidationOrders[index].amount = 1;
         }
-
-        if (liquidationOrders[index].qty > process.env.MIN_LIQUIDATION_VOLUME) {
+        const settings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
+        var settingsIndex = settings.pairs.findIndex(x => x.symbol === pair);
+        if (settingsIndex !== -1 && liquidationOrders[index].qty > settings.pairs[settingsIndex].min_volume) {
             console.log(chalk.magenta("[" + liquidationOrders[index].amount + "] " + dir + " Liquidation order for " + liquidationOrders[index].pair + " with a cumulative value of " + liquidationOrders[index].qty + " USDT"));
             scalp(pair, index);
         }
@@ -713,7 +714,7 @@ function sleep(ms) {
 async function createSettings() {
     await getMinTradingSize();
     var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
-    //get info from https://api.liquidation.report/public/research
+    //get info from https://liquidation.report/api/lickhunter
     const url = "https://liquidation.report/api/lickhunter";
     fetch(url)
     .then(res => res.json())
@@ -765,11 +766,15 @@ async function createSettings() {
                         var long_risk = out.data[i].long_price;
                         var short_risk = out.data[i].short_price;
                     }
+                    var lick_qty = out.data[i].lick_qty;
+                    if (lick_qty < process.env.MIN_LIQUIDATION_VOLUME) {
+                        var lick_qty = process.env.MIN_LIQUIDATION_VOLUME;
+                    }
 
                     var pair = {
                         "symbol": out.data[i].name + "USDT",
                         "leverage": process.env.LEVERAGE,
-                        "min_volume": process.env.MIN_LIQUIDATION_VOLUME,
+                        "min_volume": lick_qty,
                         "take_profit": process.env.TAKE_PROFIT_PERCENT,
                         "stop_loss": process.env.STOP_LOSS_PERCENT,
                         "order_size": minOrderSizes[index].minOrderSize,
