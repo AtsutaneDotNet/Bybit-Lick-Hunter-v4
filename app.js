@@ -88,7 +88,10 @@ wsClient.on('update', (data) => {
             liquidationOrders[index].amount = 1;
         }
 
-        if (liquidationOrders[index].qty > process.env.MIN_LIQUIDATION_VOLUME) {
+        //Load min volume from settings.json
+        const settings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
+        var settingsIndex = settings.pairs.findIndex(x => x.symbol === pair);
+        if (settingsIndex !== -1 && liquidationOrders[index].qty > settings.pairs[settingsIndex].min_volume) {
             scalp(pair, index);
         }
         else {
@@ -867,7 +870,7 @@ async function createSettings() {
                     var pair = {
                         "symbol": out.data[i].name + "USDT",
                         "leverage": process.env.LEVERAGE,
-                        "min_volume": process.env.MIN_LIQUIDATION_VOLUME,
+                        "min_volume": out.data[i].liq_volume,
                         "take_profit": process.env.TAKE_PROFIT_PERCENT,
                         "stop_loss": process.env.STOP_LOSS_PERCENT,
                         "order_size": minOrderSizes[index].minOrderSize,
@@ -954,6 +957,7 @@ async function updateSettings() {
                         //updated settings.json file
                         settingsFile.pairs[settingsIndex].long_price = long_risk;
                         settingsFile.pairs[settingsIndex].short_price = short_risk;
+                        settingsFile.pairs[settingsIndex].min_volume = out.data[i].liq_volume;
                     }
                 }
                 fs.writeFileSync('settings.json', JSON.stringify(settingsFile, null, 4));
@@ -1009,6 +1013,7 @@ async function updateSettings() {
                                 //updated settings.json file
                                 settingsFile.pairs[settingsIndex].long_price = long_risk;
                                 settingsFile.pairs[settingsIndex].short_price = short_risk;
+                                settingsFile.pairs[settingsIndex].min_volume = researchFile.data[i].liq_volume;
                             }
                         }
                         catch(err){
