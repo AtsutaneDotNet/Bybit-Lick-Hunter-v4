@@ -45,7 +45,7 @@ wsClient.on('update', (data) => {
     //console.log('raw message received ', JSON.stringify(data, null, 2));
     var pair = data.data.symbol;
     var price = parseFloat(data.data.price);
-    var oside = data.data.side;
+    var side = data.data.side;
     //convert to float
     var qty = parseFloat(data.liquidationOrder.qty) * price;
     //create timestamp
@@ -54,7 +54,7 @@ wsClient.on('update', (data) => {
     var index = liquidationOrders.findIndex(x => x.pair === pair);
 
     var dir = "";
-    if (oside === "Buy") {
+    if (side === "Buy") {
         dir = "Long";
     } else {
         dir = "Short";
