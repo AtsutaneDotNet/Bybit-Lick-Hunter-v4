@@ -99,7 +99,7 @@ wsClient.on('update', (data) => {
             scalp(pair, index);
         }
         else {
-            console.log(chalk.magenta("[" + liquidationOrders[index].amount + "] " + dir + " Liquidation order for " + liquidationOrders[index].pair + " with a cumulative value of " + liquidationOrders[index].qty + " USDT"));
+            console.log(chalk.magenta("[" + liquidationOrders[index].amount + "] " + dir + " Liquidation order for " + liquidationOrders[index].pair + "@Bybit with a cumulative value of " + liquidationOrders[index].qty + " USDT"));
             console.log(chalk.yellow("Not enough liquidations to trade " + liquidationOrders[index].pair));
         }
 
@@ -169,7 +169,7 @@ binanceClient.on('formattedMessage', (data) => {
             scalp(pair, index);
         }
         else {
-            console.log(chalk.magenta("[" + liquidationOrders[index].amount + "] " + dir + " Liquidation order for " + liquidationOrders[index].pair + " with a cumulative value of " + liquidationOrders[index].qty + " USDT"));
+            console.log(chalk.magenta("[" + liquidationOrders[index].amount + "] " + dir + " Liquidation order for " + liquidationOrders[index].pair + "@Binance with a cumulative value of " + liquidationOrders[index].qty + " USDT"));
             console.log(chalk.yellow("Not enough liquidations to trade " + liquidationOrders[index].pair));
         }
 
