@@ -1,5 +1,6 @@
-import { LinearClient } from 'bybit-api-gnome';
-import { WebsocketClient } from 'binance';
+import pkg from 'bybit-api-gnome';
+const { WebsocketClient, WS_KEY_MAP, LinearClient} = pkg;
+import { WebsocketClient as binanceWS } from 'binance';
 import { config } from 'dotenv';
 config();
 import fetch from 'node-fetch';
@@ -25,6 +26,12 @@ var lastUpdate = 0;
 
 //create ws client
 const wsClient = new WebsocketClient({
+    key: key,
+    secret: secret,
+    market: 'linear',
+    livenet: true,
+});
+const binanceClient = new binanceWS({
     beautify: true,
 });
 //create linear client
@@ -34,7 +41,74 @@ const linearClient = new LinearClient({
     livenet: true,
 });
 
-wsClient.on('formattedMessage', (data) => {
+wsClient.on('update', (data) => {
+    //console.log('raw message received ', JSON.stringify(data, null, 2));
+    var pair = data.data.symbol;
+    var price = parseFloat(data.data.price);
+    var oside = data.data.side;
+    //convert to float
+    var qty = parseFloat(data.liquidationOrder.qty) * price;
+    //create timestamp
+    var timestamp = Math.floor(Date.now() / 1000);
+    //find what index of liquidationOrders array is the pair
+    var index = liquidationOrders.findIndex(x => x.pair === pair);
+
+    var dir = "";
+    if (oside === "Buy") {
+        dir = "Long";
+    } else {
+        dir = "Short";
+    }
+
+    //get blacklisted pairs
+    const blacklist = [];
+    process.env.BLACKLIST.split(', ').forEach(item => {
+        blacklist.push(item);
+    });
+
+    //if pair is not in liquidationOrders array and not in blacklist, add it
+    if (index === -1 && !blacklist.includes(pair)) {
+        liquidationOrders.push({pair: pair, price: price, side: side, qty: qty, amount: 1, timestamp: timestamp});
+        index = liquidationOrders.findIndex(x => x.pair === pair);
+    }
+    //if pair is in liquidationOrders array, update it
+    else if (!blacklist.includes(pair)) {
+        //check if timesstamp is withing 5 seconds of previous timestamp
+        if (timestamp - liquidationOrders[index].timestamp <= 5) {
+            liquidationOrders[index].price = price;
+            liquidationOrders[index].side = side;
+            //add qty to existing qty and round to 2 decimal places
+            liquidationOrders[index].qty = parseFloat((liquidationOrders[index].qty + qty).toFixed(2));
+            liquidationOrders[index].timestamp = timestamp;
+            liquidationOrders[index].amount = liquidationOrders[index].amount + 1;
+
+        }
+        //if timestamp is more than 5 seconds from previous timestamp, overwrite
+        else {
+            liquidationOrders[index].price = price;
+            liquidationOrders[index].side = side;
+            liquidationOrders[index].qty = qty;
+            liquidationOrders[index].timestamp = timestamp;
+            liquidationOrders[index].amount = 1;
+        }
+
+        //Load min volume from settings.json
+        const settings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
+        var settingsIndex = settings.pairs.findIndex(x => x.symbol === pair);
+        if (settingsIndex !== -1 && liquidationOrders[index].qty > settings.pairs[settingsIndex].min_volume) {
+            scalp(pair, index);
+        }
+        else {
+            console.log(chalk.magenta("[" + liquidationOrders[index].amount + "] " + dir + " Liquidation order for " + liquidationOrders[index].pair + " with a cumulative value of " + liquidationOrders[index].qty + " USDT"));
+            console.log(chalk.yellow("Not enough liquidations to trade " + liquidationOrders[index].pair));
+        }
+
+    }
+    else {
+        console.log(chalk.gray("Liquidation Found for Blacklisted pair: " + pair + " ignoring..."));
+    }
+});
+binanceClient.on('formattedMessage', (data) => {
     //console.log('raw message received ', JSON.stringify(data, null, 2));
     var pair = data.liquidationOrder.symbol;
     var price = parseFloat(data.liquidationOrder.price);
@@ -107,24 +181,47 @@ wsClient.on('formattedMessage', (data) => {
 
 wsClient.on('open', (data,) => {
     //console.log('connection opened open:', data.wsKey);
-});
-wsClient.on('reply', (data) => {
+    //catch error
+    if (data.wsKey === WS_KEY_MAP.WS_KEY_ERROR) {
+        console.log('error', data);
+        return;
+    }
     //console.log("Connection opened");
 });
-wsClient.on('reconnecting', ({ wsKey }) => {
+wsClient.on('response', (data) => {
+    if (data.wsKey === WS_KEY_MAP.WS_KEY_ERROR) {
+        console.log('error', data);
+        return;
+    }
+    //console.log("Connection opened");
+});
+wsClient.on('reconnect', ({ wsKey }) => {
     console.log('ws automatically reconnecting.... ', wsKey);
 });
 wsClient.on('reconnected', (data) => {
     console.log('ws has reconnected ', data?.wsKey);
 });
-wsClient.on('error', (data) => {
+binanceClient.on('open', (data,) => {
+    //console.log('connection opened open:', data.wsKey);
+});
+binanceClient.on('reply', (data) => {
+    //console.log("Connection opened");
+});
+binanceClient.on('reconnecting', ({ wsKey }) => {
+    console.log('ws automatically reconnecting.... ', wsKey);
+});
+binanceClient.on('reconnected', (data) => {
+    console.log('ws has reconnected ', data?.wsKey);
+});
+binanceClient.on('error', (data) => {
     console.log('ws saw error ', data?.wsKey);
 });
 
 
 //run websocket
 async function liquidationEngine(pairs) {
-    wsClient.subscribeAllLiquidationOrders('usdm');
+    wsClient.subscribe(pairs);
+    binanceClient.subscribeAllLiquidationOrders('usdm');
 }
 
 //Get server time
