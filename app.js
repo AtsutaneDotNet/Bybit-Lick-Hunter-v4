@@ -1,5 +1,5 @@
-import pkg from 'bybit-api-gnome';
-const { WebsocketClient, WS_KEY_MAP, LinearClient} = pkg;
+import { LinearClient } from 'bybit-api-gnome';
+import { WebsocketClient } from 'binance';
 import { config } from 'dotenv';
 config();
 import fetch from 'node-fetch';
@@ -37,23 +37,26 @@ const linearClient = new LinearClient({
     livenet: true,
 });
 
-wsClient.on('update', (data) => {
+wsClient.on('formattedMessage', (data) => {
     //console.log('raw message received ', JSON.stringify(data, null, 2));
-    var pair = data.data.symbol;
-    var price = parseFloat(data.data.price);
-    var side = data.data.side;
+    var pair = data.liquidationOrder.symbol;
+    var price = parseFloat(data.liquidationOrder.price);
+    var oside = data.liquidationOrder.side;
     //convert to float
-    var qty = parseFloat(data.data.qty) * price;
+    var qty = parseFloat(data.liquidationOrder.qty) * price;
     //create timestamp
     var timestamp = Math.floor(Date.now() / 1000);
     //find what index of liquidationOrders array is the pair
     var index = liquidationOrders.findIndex(x => x.pair === pair);
 
     var dir = "";
-    if (side === "Buy") {
+    var side = "";
+    if (oside === "BUY") {
         dir = "Long";
+        side = "Sell";
     } else {
         dir = "Short";
+        side = "Buy";
     }
 
     //get blacklisted pairs
@@ -107,25 +110,18 @@ wsClient.on('update', (data) => {
 
 wsClient.on('open', (data,) => {
     //console.log('connection opened open:', data.wsKey);
-    //catch error
-    if (data.wsKey === WS_KEY_MAP.WS_KEY_ERROR) {
-        console.log('error', data);
-        return;
-    }
+});
+wsClient.on('reply', (data) => {
     //console.log("Connection opened");
 });
-wsClient.on('response', (data) => {
-    if (data.wsKey === WS_KEY_MAP.WS_KEY_ERROR) {
-        console.log('error', data);
-        return;
-    }
-    //console.log("Connection opened");
-});
-wsClient.on('reconnect', ({ wsKey }) => {
+wsClient.on('reconnecting', ({ wsKey }) => {
     console.log('ws automatically reconnecting.... ', wsKey);
 });
 wsClient.on('reconnected', (data) => {
     console.log('ws has reconnected ', data?.wsKey);
+});
+wsClient.on('error', (data) => {
+    console.log('ws saw error ', data?.wsKey);
 });
 
 
