@@ -25,10 +25,7 @@ var lastUpdate = 0;
 
 //create ws client
 const wsClient = new WebsocketClient({
-    key: key,
-    secret: secret,
-    market: 'linear',
-    livenet: true,
+    beautify: true,
 });
 //create linear client
 const linearClient = new LinearClient({
