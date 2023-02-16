@@ -127,7 +127,7 @@ wsClient.on('error', (data) => {
 
 //run websocket
 async function liquidationEngine(pairs) {
-    wsClient.subscribe(pairs);
+    wsClient.subscribeAllLiquidationOrders('usdm');
 }
 
 //Get server time
