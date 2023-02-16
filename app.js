@@ -40,7 +40,7 @@ wsClient.on('formattedMessage', (data) => {
     var price = parseFloat(data.liquidationOrder.price);
     var oside = data.liquidationOrder.side;
     //convert to float
-    var qty = parseFloat(data.liquidationOrder.qty) * price;
+    var qty = parseFloat(data.liquidationOrder.quantity) * price;
     //create timestamp
     var timestamp = Math.floor(Date.now() / 1000);
     //find what index of liquidationOrders array is the pair
