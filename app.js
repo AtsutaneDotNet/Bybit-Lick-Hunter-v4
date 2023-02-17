@@ -15,6 +15,7 @@ if (process.env.USE_DISCORD) {
 
 const key = process.env.API_KEY;
 const secret = process.env.API_SECRET;
+const apikey = process.env.LIQUIDATION_KEY;
 var rateLimit = 2000;
 var baseRateLimit = 2000;
 var lastReport = 0;
@@ -917,8 +918,15 @@ async function createSettings() {
     await getMinTradingSize();
     var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
     //get info from https://api.liquidation.report/public/research
-    const url = "https://liquidation.report/api/lickhunterpro";
-    fetch(url)
+    const url = "https://liquidation-report.p.rapidapi.com/lickhunterpro";
+    const options = {
+        method: 'GET',
+        headers: {
+            'X-RapidAPI-Key': apikey,
+            'X-RapidAPI-Host': 'liquidation-report.p.rapidapi.com'
+        }
+    };
+    fetch(url,options)
     .then(res => res.json())
     .then((out) => {
         //create settings.json file with multiple pairs
@@ -1008,8 +1016,15 @@ async function updateSettings() {
             }
             var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
             var settingsFile = JSON.parse(fs.readFileSync('settings.json'));
-            const url = "https://liquidation.report/api/lickhunterpro";
-            fetch(url)
+            const url = "https://liquidation-report.p.rapidapi.com/lickhunterpro";
+            const options = {
+                method: 'GET',
+                headers: {
+                    'X-RapidAPI-Key': apikey,
+                    'X-RapidAPI-Host': 'liquidation-report.p.rapidapi.com'
+                }
+            };
+            fetch(url,options)
             .then(res => res.json())
             .then((out) => {
                 //create settings.json file with multiple pairs
