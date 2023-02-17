@@ -917,7 +917,7 @@ async function createSettings() {
     await getMinTradingSize();
     var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
     //get info from https://api.liquidation.report/public/research
-    const url = "https://liquidation.report/api/lickhunter";
+    const url = "https://liquidation.report/api/lickhunterpro";
     fetch(url)
     .then(res => res.json())
     .then((out) => {
@@ -1008,7 +1008,7 @@ async function updateSettings() {
             }
             var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
             var settingsFile = JSON.parse(fs.readFileSync('settings.json'));
-            const url = "https://liquidation.report/api/lickhunter";
+            const url = "https://liquidation.report/api/lickhunterpro";
             fetch(url)
             .then(res => res.json())
             .then((out) => {
