@@ -27,6 +27,7 @@ if (process.env.USE_DISCORD == "true") {
 
 const key = process.env.API_KEY;
 const secret = process.env.API_SECRET;
+const apikey = process.env.LIQUIDATION_KEY;
 var rateLimit = 2000;
 var baseRateLimit = 2000;
 var lastReport = 0;
@@ -123,7 +124,10 @@ wsClient.on('update', (data) => {
             liquidationOrders[index].amount = 1;
         }
 
-        if (liquidationOrders[index].qty > process.env.MIN_LIQUIDATION_VOLUME) {
+        //Load min volume from settings.json
+        const settings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
+        var settingsIndex = settings.pairs.findIndex(x => x.symbol === pair);
+        if (settingsIndex !== -1 && liquidationOrders[index].qty > settings.pairs[settingsIndex].min_volume) {
             scalp(pair, index, liquidationOrders[index].qty);
         }
         else {
@@ -896,8 +900,15 @@ async function createSettings() {
     await getMinTradingSize();
     var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
     //get info from https://api.liquidation.report/public/research
-    const url = "https://liquidation.report/api/lickhunter";
-    fetch(url)
+    const url = "https://liquidation-report.p.rapidapi.com/lickhunterpro";
+    const options = {
+        method: 'GET',
+        headers: {
+            'X-RapidAPI-Key': apikey,
+            'X-RapidAPI-Host': 'liquidation-report.p.rapidapi.com'
+        }
+    };
+    fetch(url,options)
     .then(res => res.json())
     .then((out) => {
         //create settings.json file with multiple pairs
@@ -951,7 +962,7 @@ async function createSettings() {
                     var pair = {
                         "symbol": out.data[i].name + "USDT",
                         "leverage": process.env.LEVERAGE,
-                        "min_volume": process.env.MIN_LIQUIDATION_VOLUME,
+                        "min_volume": out.data[i].liq_volume,
                         "take_profit": process.env.TAKE_PROFIT_PERCENT,
                         "stop_loss": process.env.STOP_LOSS_PERCENT,
                         "order_size": minOrderSizes[index].minOrderSize,
@@ -987,8 +998,15 @@ async function updateSettings() {
             }
             var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
             var settingsFile = JSON.parse(fs.readFileSync('settings.json'));
-            const url = "https://liquidation.report/api/lickhunter";
-            fetch(url)
+            const url = "https://liquidation-report.p.rapidapi.com/lickhunterpro";
+            const options = {
+                method: 'GET',
+                headers: {
+                    'X-RapidAPI-Key': apikey,
+                    'X-RapidAPI-Host': 'liquidation-report.p.rapidapi.com'
+                }
+            };
+            fetch(url,options)
             .then(res => res.json())
             .then((out) => {
                 //create settings.json file with multiple pairs
@@ -1038,6 +1056,7 @@ async function updateSettings() {
                         //updated settings.json file
                         settingsFile.pairs[settingsIndex].long_price = long_risk;
                         settingsFile.pairs[settingsIndex].short_price = short_risk;
+                        settingsFile.pairs[settingsIndex].min_volume = out.data[i].liq_volume;
                     }
                 }
                 fs.writeFileSync('settings.json', JSON.stringify(settingsFile, null, 4));
@@ -1093,6 +1112,7 @@ async function updateSettings() {
                                 //updated settings.json file
                                 settingsFile.pairs[settingsIndex].long_price = long_risk;
                                 settingsFile.pairs[settingsIndex].short_price = short_risk;
+                                settingsFile.pairs[settingsIndex].min_volume = researchFile.data[i].liq_volume;
                             }
                         }
                         catch(err){
