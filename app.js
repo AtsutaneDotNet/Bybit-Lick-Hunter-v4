@@ -354,13 +354,13 @@ binanceClient.on('reply', (data) => {
     //console.log("Connection opened");
 });
 binanceClient.on('reconnecting', ({ wsKey }) => {
-    logIT('ws automatically reconnecting.... ', wsKey);
+    console.log(getLogTimesStamp() + " ::  " + 'ws automatically reconnecting.... ', wsKey);
 });
 binanceClient.on('reconnected', (data) => {
-    logIT('ws has reconnected ', data?.wsKey);
+    console.log(getLogTimesStamp() + " ::  " + 'ws has reconnected ', data?.wsKey);
 });
 binanceClient.on('error', (data) => {
-    logIT('ws saw error ', data?.wsKey);
+    console.log(getLogTimesStamp() + " ::  " + 'ws saw error ', data?.wsKey);
 });
 
 //subscribe to stop_order to see when we hit stop-loss
@@ -368,16 +368,8 @@ wsClient.subscribe('stop_order')
 
 //run websocket
 async function liquidationEngine(pairs) {
-    if (process.env.LIQ_SOURCE.toLowerCase() == 'both') {
-        wsClient.subscribe(pairs);
-        binanceClient.subscribeAllLiquidationOrders('usdm');
-    }
-    else if (process.env.LIQ_SOURCE.toLowerCase() == 'binance') {
-        binanceClient.subscribeAllLiquidationOrders('usdm');
-    }
-    else {
-        wsClient.subscribe(pairs);
-    }
+    wsClient.subscribe(pairs);
+    binanceClient.subscribeAllLiquidationOrders('usdm');
 }
 
 async function transferFunds(amount) {
