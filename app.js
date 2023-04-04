@@ -1550,7 +1550,6 @@ async function reportWebhook() {
         //fetch balance first if not startingBalance will be null
         var balance = await getBalance();
         //check if starting balance is set
-        var balance = await getBalance();
         if (settings.startingBalance === 0) {
             settings.startingBalance = balance;
             fs.writeFileSync('account.json', JSON.stringify(settings, null, 4));
