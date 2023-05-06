@@ -1462,6 +1462,8 @@ async function createSettings() {
     .then(res => res.json())
     .then((out) => {
         //create settings.json file with multiple pairs
+        //save result to research.json
+        fs.writeFileSync('research.json', JSON.stringify(out, null, 4));
         var settings = {};
         settings["pairs"] = [];
         for (var i = 0; i < out.data.length; i++) {
