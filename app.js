@@ -1963,6 +1963,17 @@ async function reportWebhook() {
     }
 }
 
+//check settings.json
+async function checkSettings() {
+    var settingsFile = JSON.parse(fs.readFileSync('settings.json'));
+    logIT("Debug: ",settingsFile.pairs.length);
+    if (settingsFile.pairs.length == 0) {
+        logIT("Empty: ",settingsFile.pairs.length);
+    }
+    else {
+        logIT("Ok: ",settingsFile.pairs.length);
+    }
+}
 
 async function main() {
     //logIT("Starting Lick Hunter!");
@@ -1990,6 +2001,7 @@ async function main() {
         if (process.env.USE_SMART_SETTINGS.toLowerCase() == "true") {
             logIT("Updating settings.json with smart settings");
             await createSettings();
+            await checkSettings();
         }
     }
     catch (err) {
