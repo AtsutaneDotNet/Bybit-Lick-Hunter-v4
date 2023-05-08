@@ -1859,6 +1859,7 @@ async function reportWebhook() {
         var percentGain = (diff / startingBalance) * 100;
         var percentGain = percentGain.toFixed(6);
         var diff = diff.toFixed(6);
+        logIT(chalk.red("Debug " + balance));
         var balance = balance.toFixed(2);
         //fetch positions
         var positions = await linearClient.getPosition();
@@ -1966,12 +1967,10 @@ async function reportWebhook() {
 //check settings.json
 async function checkSettings() {
     var settingsFile = JSON.parse(fs.readFileSync('settings.json'));
-    logIT("Debug: ",settingsFile.pairs.length);
+    //logIT("Debug: ",settingsFile.pairs.length);
     if (settingsFile.pairs.length == 0) {
-        logIT("Empty: ",settingsFile.pairs.length);
-    }
-    else {
-        logIT("Ok: ",settingsFile.pairs.length);
+        logIT("Settings.json is empty. Recreate settings.json");
+        await createSettings();
     }
 }
 
@@ -2001,7 +2000,6 @@ async function main() {
         if (process.env.USE_SMART_SETTINGS.toLowerCase() == "true") {
             logIT("Updating settings.json with smart settings");
             await createSettings();
-            await checkSettings();
         }
     }
     catch (err) {
@@ -2017,6 +2015,7 @@ async function main() {
 
     while (true) {
         try {
+            await checkSettings();
             await getBalance();
             await updateSettings();
             await checkOpenPositions();
