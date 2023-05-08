@@ -1019,16 +1019,20 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                             if (process.env.USE_STOPLOSS == "true")
                                 cfg['stop_loss'] = minuspercent(price, process.env.STOP_LOSS_PERCENT).toFixed(decimalPlaces)
 
-                            // send order payload
-                            const order = await linearClient.placeActiveOrder(cfg);
-                            handleNewOrder(order.result, trigger_qty);
-                            //logIT("Order placed: " + JSON.stringify(order, null, 2));
-                            logIT(chalk.bgGreenBright("Long Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
-                            if(process.env.USE_DISCORD == "true") {
-                                orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Buy", position.size, position.percentGain, trigger_qty, source);
+                            //make sure pair is tradeable
+                            if (tickData[index].tradeable == true) {
+                                // send order payload
+                                const order = await linearClient.placeActiveOrder(cfg);
+                                handleNewOrder(order.result, trigger_qty);
+                                //logIT("Order placed: " + JSON.stringify(order, null, 2));
+                                logIT(chalk.bgGreenBright("Long Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
+                                if(process.env.USE_DISCORD == "true") {
+                                    orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Buy", position.size, position.percentGain, trigger_qty, source);
+                                }
                             }
-                            
-            
+                            else {
+                                logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE for " + pair));
+                            }            
                         }
                         //open DCA position
                         else if (position.side === "Buy" && position.size > 0 && position.percentGain < 0 && process.env.USE_DCA_FEATURE == "true") {
@@ -1041,21 +1045,28 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                 var decimalPlaces = (tickSize.toString().split(".")[1] || []).length;
                                 // set leverage and margin-mode
                                 setLeverage(pair, process.env.LEVERAGE)
-                                // order payload
-                                const order = await linearClient.placeActiveOrder({
-                                    symbol: pair,
-                                    side: "Buy",
-                                    order_type: "Market",
-                                    qty: settings.pairs[settingsIndex].order_size.toFixed(decimalPlaces),
-                                    time_in_force: "GoodTillCancel",
-                                    reduce_only: false,
-                                    close_on_trigger: false
-                                });
-                                handleDcaOrder(order.result, trigger_qty);
-                                //logIT("Order placed: " + JSON.stringify(order, null, 2));
-                                logIT(chalk.bgGreenBright.black("Long DCA Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
-                                if(process.env.USE_DISCORD == "true") {
-                                    orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Buy", position.size, position.percentGain, trigger_qty, source);
+
+                                //make sure pair is tradeable
+                                if (tickData[index].tradeable == true) {
+                                    // order payload
+                                    const order = await linearClient.placeActiveOrder({
+                                        symbol: pair,
+                                        side: "Buy",
+                                        order_type: "Market",
+                                        qty: settings.pairs[settingsIndex].order_size.toFixed(decimalPlaces),
+                                        time_in_force: "GoodTillCancel",
+                                        reduce_only: false,
+                                        close_on_trigger: false
+                                    });
+                                    handleDcaOrder(order.result, trigger_qty);
+                                    //logIT("Order placed: " + JSON.stringify(order, null, 2));
+                                    logIT(chalk.bgGreenBright.black("Long DCA Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
+                                    if(process.env.USE_DISCORD == "true") {
+                                        orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Buy", position.size, position.percentGain, trigger_qty, source);
+                                    }
+                                }
+                                else {
+                                    logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE for " + pair));
                                 }
                             }
                             else {
@@ -1126,14 +1137,20 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                 cfg['take_profit'] = minuspercent(price, process.env.TAKE_PROFIT_PERCENT).toFixed(decimalPlaces)
                             if (process.env.USE_STOPLOSS == "true")
                                 cfg['stop_loss'] = pluspercent(price, process.env.STOP_LOSS_PERCENT).toFixed(decimalPlaces)
-
-                            // send order payload
-                            const order = await linearClient.placeActiveOrder(cfg);
-                            handleNewOrder(order.result, trigger_qty);
-                            //logIT("Order placed: " + JSON.stringify(order, null, 2));
-                            logIT(chalk.bgRedBright("Short Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
-                            if(process.env.USE_DISCORD == "true") {
-                                orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Sell", position.size, position.percentGain, trigger_qty, source);
+                            
+                            //make sure pair is tradeable
+                            if (tickData[index].tradeable == true) {
+                                // send order payload
+                                const order = await linearClient.placeActiveOrder(cfg);
+                                handleNewOrder(order.result, trigger_qty);
+                                //logIT("Order placed: " + JSON.stringify(order, null, 2));
+                                logIT(chalk.bgRedBright("Short Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
+                                if(process.env.USE_DISCORD == "true") {
+                                    orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Sell", position.size, position.percentGain, trigger_qty, source);
+                                }
+                            }
+                            else {
+                                logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE for " + pair));
                             }
     
                         }
@@ -1148,21 +1165,28 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                 var decimalPlaces = (tickSize.toString().split(".")[1] || []).length;
                                 // set leverage and margin-mode
                                 setLeverage(pair, process.env.LEVERAGE)
-                                // order payload
-                                const order = await linearClient.placeActiveOrder({
-                                    symbol: pair,
-                                    side: "Sell",
-                                    order_type: "Market",
-                                    qty: settings.pairs[settingsIndex].order_size.toFixed(decimalPlaces),
-                                    time_in_force: "GoodTillCancel",
-                                    reduce_only: false,
-                                    close_on_trigger: false
-                                });
-                                handleDcaOrder(order.result, trigger_qty);
-                                //logIT("Order placed: " + JSON.stringify(order, null, 2));
-                                logIT(chalk.bgRedBright("Short DCA Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
-                                if(process.env.USE_DISCORD == "true") {
-                                    orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Sell", position.size, position.percentGain, trigger_qty, source);
+
+                                //make sure pair is tradeable
+                                if (tickData[index].tradeable == true) {
+                                    // order payload
+                                    const order = await linearClient.placeActiveOrder({
+                                        symbol: pair,
+                                        side: "Sell",
+                                        order_type: "Market",
+                                        qty: settings.pairs[settingsIndex].order_size.toFixed(decimalPlaces),
+                                        time_in_force: "GoodTillCancel",
+                                        reduce_only: false,
+                                        close_on_trigger: false
+                                    });
+                                    handleDcaOrder(order.result, trigger_qty);
+                                    //logIT("Order placed: " + JSON.stringify(order, null, 2));
+                                    logIT(chalk.bgRedBright("Short DCA Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
+                                    if(process.env.USE_DISCORD == "true") {
+                                        orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Sell", position.size, position.percentGain, trigger_qty, source);
+                                    }
+                                }
+                                else {
+                                    logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE for " + pair));
                                 }
                             }
                             else {
@@ -1522,12 +1546,7 @@ async function createSettings() {
                         "long_price": long_risk,
                         "short_price": short_risk
                     }
-                    if (minOrderSizes[index].tradeable == true) {
-                        settings["pairs"].push(pair);
-                    }
-                    else {
-                        continue;
-                    }
+                    settings["pairs"].push(pair);
                 }
             }
         }
