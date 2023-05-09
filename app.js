@@ -1031,7 +1031,7 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                 }
                             }
                             else {
-                                logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE for " + pair));
+                                logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE or Leverage is higher than Max Leverage for " + pair));
                             }            
                         }
                         //open DCA position
@@ -1066,7 +1066,7 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                     }
                                 }
                                 else {
-                                    logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE for " + pair));
+                                    logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE or Leverage is higher than Max Leverage for " + pair));
                                 }
                             }
                             else {
@@ -1150,7 +1150,7 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                 }
                             }
                             else {
-                                logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE for " + pair));
+                                logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE or Leverage is higher than Max Leverage for " + pair));
                             }
     
                         }
@@ -1186,7 +1186,7 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                     }
                                 }
                                 else {
-                                    logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE for " + pair));
+                                    logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE or Leverage is higher than Max Leverage for " + pair));
                                 }
                             }
                             else {
@@ -1386,6 +1386,14 @@ async function getMinTradingSize() {
                 //convert min orderSizeUSD to pair value
                 var minOrderSizePair = (minOrderSizeUSD / price);
                 var tradeable = true
+            }
+            //check if max_leverage value is less than process.env.LEVERAGE
+            var max_leverage = data.result[i].leverage_filter.max_leverage;
+            if (process.env.LEVERAGE <= max_leverage) {
+                var tradeable = true
+            }
+            else {
+                var tradeable = false
             }
             try{
                 //find pair ion positions
