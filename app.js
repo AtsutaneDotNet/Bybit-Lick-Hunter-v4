@@ -60,6 +60,7 @@ const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const key = process.env.API_KEY;
 const secret = process.env.API_SECRET;
+const apikey = process.env.LIQUIDATION_KEY;
 const stopLossCoins = new Map();
 
 // tradesStat store metric about current trade
@@ -334,7 +335,10 @@ wsClient.on('update', (data) => {
                 liquidationOrders[index].amount = 1;
             }
 
-            if (liquidationOrders[index].qty > process.env.MIN_LIQUIDATION_VOLUME) {
+            //Load min volume from settings.json
+            const settings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
+            var settingsIndex = settings.pairs.findIndex(x => x.symbol === pair);
+            if (settingsIndex !== -1 && liquidationOrders[index].qty > settings.pairs[settingsIndex].min_volume) {
                 
                 if (stopLossCoins.has(pair) == true && process.env.USE_STOP_LOSS_TIMEOUT == "true") {
                     logIT(chalk.yellow(liquidationOrders[index].pair + " is not allowed to trade cause it is on timeout"));
@@ -418,7 +422,10 @@ binanceClient.on('formattedMessage', (data) => {
             liquidationOrders[index].amount = 1;
         }
 
-        if (liquidationOrders[index].qty > process.env.MIN_LIQUIDATION_VOLUME) {
+        //Load min volume from settings.json
+        const settings = JSON.parse(fs.readFileSync('settings.json', 'utf8'));
+        var settingsIndex = settings.pairs.findIndex(x => x.symbol === pair);
+        if (settingsIndex !== -1 && liquidationOrders[index].qty > settings.pairs[settingsIndex].min_volume) {
                 
             if (stopLossCoins.has(pair) == true && process.env.USE_STOP_LOSS_TIMEOUT == "true") {
                 logIT(chalk.yellow(liquidationOrders[index].pair + " is not allowed to trade cause it is on timeout"));
@@ -1010,16 +1017,20 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                             if (process.env.USE_STOPLOSS == "true")
                                 cfg['stop_loss'] = minuspercent(price, process.env.STOP_LOSS_PERCENT).toFixed(decimalPlaces)
 
-                            // send order payload
-                            const order = await linearClient.placeActiveOrder(cfg);
-                            handleNewOrder(order.result, trigger_qty);
-                            //logIT("Order placed: " + JSON.stringify(order, null, 2));
-                            logIT(chalk.bgGreenBright("Long Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
-                            if(process.env.USE_DISCORD == "true") {
-                                orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Buy", position.size, position.percentGain, trigger_qty, source);
+                            //make sure pair is tradeable
+                            if (tickData[index].tradeable == true) {
+                                // send order payload
+                                const order = await linearClient.placeActiveOrder(cfg);
+                                handleNewOrder(order.result, trigger_qty);
+                                //logIT("Order placed: " + JSON.stringify(order, null, 2));
+                                logIT(chalk.bgGreenBright("Long Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
+                                if(process.env.USE_DISCORD == "true") {
+                                    orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Buy", position.size, position.percentGain, trigger_qty, source);
+                                }
                             }
-                            
-            
+                            else {
+                                logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE or Leverage is higher than Max Leverage for " + pair));
+                            }            
                         }
                         //open DCA position
                         else if (position.side === "Buy" && position.size > 0 && position.percentGain < 0 && process.env.USE_DCA_FEATURE == "true") {
@@ -1032,21 +1043,28 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                 var decimalPlaces = (tickSize.toString().split(".")[1] || []).length;
                                 // set leverage and margin-mode
                                 setLeverage(pair, process.env.LEVERAGE)
-                                // order payload
-                                const order = await linearClient.placeActiveOrder({
-                                    symbol: pair,
-                                    side: "Buy",
-                                    order_type: "Market",
-                                    qty: settings.pairs[settingsIndex].order_size.toFixed(decimalPlaces),
-                                    time_in_force: "GoodTillCancel",
-                                    reduce_only: false,
-                                    close_on_trigger: false
-                                });
-                                handleDcaOrder(order.result, trigger_qty);
-                                //logIT("Order placed: " + JSON.stringify(order, null, 2));
-                                logIT(chalk.bgGreenBright.black("Long DCA Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
-                                if(process.env.USE_DISCORD == "true") {
-                                    orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Buy", position.size, position.percentGain, trigger_qty, source);
+
+                                //make sure pair is tradeable
+                                if (tickData[index].tradeable == true) {
+                                    // order payload
+                                    const order = await linearClient.placeActiveOrder({
+                                        symbol: pair,
+                                        side: "Buy",
+                                        order_type: "Market",
+                                        qty: settings.pairs[settingsIndex].order_size.toFixed(decimalPlaces),
+                                        time_in_force: "GoodTillCancel",
+                                        reduce_only: false,
+                                        close_on_trigger: false
+                                    });
+                                    handleDcaOrder(order.result, trigger_qty);
+                                    //logIT("Order placed: " + JSON.stringify(order, null, 2));
+                                    logIT(chalk.bgGreenBright.black("Long DCA Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
+                                    if(process.env.USE_DISCORD == "true") {
+                                        orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Buy", position.size, position.percentGain, trigger_qty, source);
+                                    }
+                                }
+                                else {
+                                    logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE or Leverage is higher than Max Leverage for " + pair));
                                 }
                             }
                             else {
@@ -1117,14 +1135,20 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                 cfg['take_profit'] = minuspercent(price, process.env.TAKE_PROFIT_PERCENT).toFixed(decimalPlaces)
                             if (process.env.USE_STOPLOSS == "true")
                                 cfg['stop_loss'] = pluspercent(price, process.env.STOP_LOSS_PERCENT).toFixed(decimalPlaces)
-
-                            // send order payload
-                            const order = await linearClient.placeActiveOrder(cfg);
-                            handleNewOrder(order.result, trigger_qty);
-                            //logIT("Order placed: " + JSON.stringify(order, null, 2));
-                            logIT(chalk.bgRedBright("Short Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
-                            if(process.env.USE_DISCORD == "true") {
-                                orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Sell", position.size, position.percentGain, trigger_qty, source);
+                            
+                            //make sure pair is tradeable
+                            if (tickData[index].tradeable == true) {
+                                // send order payload
+                                const order = await linearClient.placeActiveOrder(cfg);
+                                handleNewOrder(order.result, trigger_qty);
+                                //logIT("Order placed: " + JSON.stringify(order, null, 2));
+                                logIT(chalk.bgRedBright("Short Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
+                                if(process.env.USE_DISCORD == "true") {
+                                    orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Sell", position.size, position.percentGain, trigger_qty, source);
+                                }
+                            }
+                            else {
+                                logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE or Leverage is higher than Max Leverage for " + pair));
                             }
     
                         }
@@ -1139,21 +1163,28 @@ async function scalp(pair, index, trigger_qty, source, new_trades_disabled = fal
                                 var decimalPlaces = (tickSize.toString().split(".")[1] || []).length;
                                 // set leverage and margin-mode
                                 setLeverage(pair, process.env.LEVERAGE)
-                                // order payload
-                                const order = await linearClient.placeActiveOrder({
-                                    symbol: pair,
-                                    side: "Sell",
-                                    order_type: "Market",
-                                    qty: settings.pairs[settingsIndex].order_size.toFixed(decimalPlaces),
-                                    time_in_force: "GoodTillCancel",
-                                    reduce_only: false,
-                                    close_on_trigger: false
-                                });
-                                handleDcaOrder(order.result, trigger_qty);
-                                //logIT("Order placed: " + JSON.stringify(order, null, 2));
-                                logIT(chalk.bgRedBright("Short DCA Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
-                                if(process.env.USE_DISCORD == "true") {
-                                    orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Sell", position.size, position.percentGain, trigger_qty, source);
+
+                                //make sure pair is tradeable
+                                if (tickData[index].tradeable == true) {
+                                    // order payload
+                                    const order = await linearClient.placeActiveOrder({
+                                        symbol: pair,
+                                        side: "Sell",
+                                        order_type: "Market",
+                                        qty: settings.pairs[settingsIndex].order_size.toFixed(decimalPlaces),
+                                        time_in_force: "GoodTillCancel",
+                                        reduce_only: false,
+                                        close_on_trigger: false
+                                    });
+                                    handleDcaOrder(order.result, trigger_qty);
+                                    //logIT("Order placed: " + JSON.stringify(order, null, 2));
+                                    logIT(chalk.bgRedBright("Short DCA Order Placed for " + pair + " at " + settings.pairs[settingsIndex].order_size + " size"));
+                                    if(process.env.USE_DISCORD == "true") {
+                                        orderWebhook(pair, settings.pairs[settingsIndex].order_size, "Sell", position.size, position.percentGain, trigger_qty, source);
+                                    }
+                                }
+                                else {
+                                    logIT(chalk.redBright("Min Order size is greater than PERCENT_ORDER_SIZE or Leverage is higher than Max Leverage for " + pair));
                                 }
                             }
                             else {
@@ -1354,6 +1385,14 @@ async function getMinTradingSize() {
                 var minOrderSizePair = (minOrderSizeUSD / price);
                 var tradeable = true
             }
+            //check if max_leverage value is less than process.env.LEVERAGE
+            var max_leverage = data.result[i].leverage_filter.max_leverage;
+            if (process.env.LEVERAGE <= max_leverage) {
+                var tradeable = true
+            }
+            else {
+                var tradeable = false
+            }
             try{
                 //find pair ion positions
                 var position = positions.result.find(x => x.data.symbol === data.result[i].name);
@@ -1441,11 +1480,20 @@ async function createSettings() {
     await getMinTradingSize();
     var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
     //get info from https://api.liquidation.report/public/research
-    const url = "https://liquidation.report/api/lickhunter";
-    fetch(url)
+    const url = "https://liquidation-report.p.rapidapi.com/lickhunterpro";
+    const options = {
+        method: 'GET',
+        headers: {
+            'X-RapidAPI-Key': apikey,
+            'X-RapidAPI-Host': 'liquidation-report.p.rapidapi.com'
+        }
+    };
+    fetch(url,options)
     .then(res => res.json())
     .then((out) => {
         //create settings.json file with multiple pairs
+        //save result to research.json
+        fs.writeFileSync('research.json', JSON.stringify(out, null, 4));
         var settings = {};
         settings["pairs"] = [];
         for (var i = 0; i < out.data.length; i++) {
@@ -1496,7 +1544,7 @@ async function createSettings() {
                     var pair = {
                         "symbol": out.data[i].name + "USDT",
                         "leverage": process.env.LEVERAGE,
-                        "min_volume": process.env.MIN_LIQUIDATION_VOLUME,
+                        "min_volume": out.data[i].liq_volume,
                         "take_profit": process.env.TAKE_PROFIT_PERCENT,
                         "stop_loss": process.env.STOP_LOSS_PERCENT,
                         "order_size": minOrderSizes[index].minOrderSize,
@@ -1504,12 +1552,7 @@ async function createSettings() {
                         "long_price": long_risk,
                         "short_price": short_risk
                     }
-                    if (minOrderSizes[index].tradeable == true) {
-                        settings["pairs"].push(pair);
-                    }
-                    else {
-                        continue;
-                    }
+                    settings["pairs"].push(pair);
                 }
             }
         }
@@ -1537,8 +1580,15 @@ async function updateSettings() {
             }
             var minOrderSizes = JSON.parse(fs.readFileSync('min_order_sizes.json'));
             var settingsFile = JSON.parse(fs.readFileSync('settings.json'));
-            const url = "https://liquidation.report/api/lickhunter";
-            fetch(url)
+            const url = "https://liquidation-report.p.rapidapi.com/lickhunterpro";
+            const options = {
+                method: 'GET',
+                headers: {
+                    'X-RapidAPI-Key': apikey,
+                    'X-RapidAPI-Host': 'liquidation-report.p.rapidapi.com'
+                }
+            };
+            fetch(url,options)
             .then(res => res.json())
             .then((out) => {
                 //create settings.json file with multiple pairs
@@ -1588,6 +1638,7 @@ async function updateSettings() {
                         //updated settings.json file
                         settingsFile.pairs[settingsIndex].long_price = long_risk;
                         settingsFile.pairs[settingsIndex].short_price = short_risk;
+                        settingsFile.pairs[settingsIndex].min_volume = out.data[i].liq_volume;
                     }
                 }
                 fs.writeFileSync('settings.json', JSON.stringify(settingsFile, null, 4));
@@ -1643,6 +1694,7 @@ async function updateSettings() {
                                 //updated settings.json file
                                 settingsFile.pairs[settingsIndex].long_price = long_risk;
                                 settingsFile.pairs[settingsIndex].short_price = short_risk;
+                                settingsFile.pairs[settingsIndex].min_volume = researchFile.data[i].liq_volume;
                             }
                         }
                         catch(err){
@@ -1813,6 +1865,7 @@ async function reportWebhook() {
         var percentGain = (diff / startingBalance) * 100;
         var percentGain = percentGain.toFixed(6);
         var diff = diff.toFixed(6);
+        logIT(chalk.red("Debug " + balance));
         var balance = balance.toFixed(2);
         //fetch positions
         var positions = await linearClient.getPosition();
@@ -1917,6 +1970,15 @@ async function reportWebhook() {
     }
 }
 
+//check settings.json
+async function checkSettings() {
+    var settingsFile = JSON.parse(fs.readFileSync('settings.json'));
+    //logIT("Debug: ",settingsFile.pairs.length);
+    if (settingsFile.pairs.length == 0) {
+        logIT("Settings.json is empty. Recreate settings.json");
+        await createSettings();
+    }
+}
 
 async function main() {
     //logIT("Starting Lick Hunter!");
@@ -1959,6 +2021,7 @@ async function main() {
 
     while (true) {
         try {
+            await checkSettings();
             await getBalance();
             await updateSettings();
             await checkOpenPositions();
